@@ -44,6 +44,30 @@ const apiConfigs = {
   }
 };
 
+// Prompt configurations for dropdown
+const promptConfigs = {
+  'truthscore': {
+    name: 'TruthScore',
+    description: 'Provides an Objective Truth Probability Score (0-1).'
+  },
+  'fullreport': {
+    name: 'Full Report',
+    description: 'Detailed analysis including truth probability, reasoning, and confidence.'
+  },
+  'sentiment': {
+    name: 'Sentiment',
+    description: 'Analyzes sentiment (positive, negative, neutral) with a score.'
+  },
+  'summary': {
+    name: 'Summary',
+    description: 'Summarizes the text in a concise manner.'
+  },
+  'contradictions': {
+    name: 'Contradictions',
+    description: 'Identifies potential contradictions or inconsistencies.'
+  }
+};
+
 // Function to draw a red box around the clicked element
 function highlightClickedElement(element) {
   const originalOutline = element.style.outline;
@@ -106,29 +130,41 @@ function toggleAssessing() {
       if (text) {
         const apiProvider = document.getElementById('api-provider').value;
         const model = document.getElementById('api-model').value;
+        const promptType = document.getElementById('prompt-type').value;
         logToConsole('Processing text: ' + text.slice(0, 50) + (text.length > 50 ? '...' : ''), 'info');
+
         chrome.runtime.sendMessage({ 
           action: 'assessTruthfulness', 
           text: text,
           apiProvider: apiProvider,
-          model: model
+          model: model,
+          promptType: promptType
         }, function(response) {
-          if (response && response.score !== undefined) {
-            const percentageScore = (response.score * 100).toFixed(2);
-            const scoreDisplay = document.createElement('div');
-            scoreDisplay.textContent = `Objective Truth Probability: ${percentageScore}%`;
-            scoreDisplay.style.position = 'absolute';
-            scoreDisplay.style.left = `${event.clientX + 10}px`;
-            scoreDisplay.style.top = `${event.clientY + 10}px`;
-            scoreDisplay.style.backgroundColor = 'rgba(0, 128, 255, 0.9)';
-            scoreDisplay.style.color = 'white';
-            scoreDisplay.style.padding = '3px 8px';
-            scoreDisplay.style.borderRadius = '3px';
-            scoreDisplay.style.zIndex = '10000';
-            document.body.appendChild(scoreDisplay);
-            setTimeout(() => scoreDisplay.remove(), 3000);
+          if (response && !response.error) {
+            const resultDisplay = document.createElement('div');
+            let displayText;
+            if (promptType === 'truthscore') {
+              const percentageScore = (response.score * 100).toFixed(2);
+              displayText = `TruthScore: ${percentageScore}%`;
+              logToConsole(`TruthScore: ${percentageScore}%`, 'success');
+            } else {
+              displayText = response.result || 'See console for details';
+              logToConsole(`${promptConfigs[promptType].name}: ${response.result}`, 'success');
+            }
+            resultDisplay.textContent = displayText;
+            resultDisplay.style.position = 'absolute';
+            resultDisplay.style.left = `${event.clientX + 10}px`;
+            resultDisplay.style.top = `${event.clientY + 10}px`;
+            resultDisplay.style.backgroundColor = 'rgba(0, 128, 255, 0.9)';
+            resultDisplay.style.color = 'white';
+            resultDisplay.style.padding = '3px 8px';
+            resultDisplay.style.borderRadius = '3px';
+            resultDisplay.style.zIndex = '10000';
+            resultDisplay.style.maxWidth = '300px'; // Added for longer text
+            resultDisplay.style.wordWrap = 'break-word'; // Added for longer text
+            document.body.appendChild(resultDisplay);
+            setTimeout(() => resultDisplay.remove(), promptType === 'fullreport' ? 5000 : 3000); // Longer timeout for fullreport
 
-            logToConsole(`Objective Truth Probability: ${percentageScore}%`, 'success');
             if (response.fullResponse) {
               logToConsole(`API Response: ${response.fullResponse}`, 'info');
             }
@@ -142,7 +178,7 @@ function toggleAssessing() {
               logToConsole('Parsing issue:', 'error', 'The API response did not return a valid score between 0 and 1.');
             }
           } else {
-            logToConsole('Unexpected response from API', 'error', 'No score or error provided.');
+            logToConsole('Unexpected response from API', 'error', 'No result or error provided.');
           }
         });
       } else {
@@ -173,9 +209,14 @@ function clearConsole() {
 function injectConsole() {
   if (document.getElementById('truthfulness-console')) return;
 
+  // Inject the CSS file
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = chrome.runtime.getURL('console.css');
+  document.head.appendChild(link);
+
   const consoleDiv = document.createElement('div');
   consoleDiv.id = 'truthfulness-console';
-  consoleDiv.className = 'debug-visible';
   consoleDiv.innerHTML = `
     <div class="console-header">
       <span>Truthfulness Assessor Console</span>
@@ -185,6 +226,7 @@ function injectConsole() {
     <div class="console-controls">
       <select id="api-provider"></select>
       <select id="api-model"></select>
+      <select id="prompt-type"></select>
       <button id="toggle-assess" class="button">Enable Click Assessment</button>
       <button id="clear-console" class="button">Clear</button>
     </div>
@@ -222,6 +264,15 @@ function injectConsole() {
   apiProviderSelect.addEventListener('change', updateModels);
   updateModels(); // Initial population
 
+  // Populate prompt type dropdown
+  const promptTypeSelect = document.getElementById('prompt-type');
+  for (let key in promptConfigs) {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = promptConfigs[key].name;
+    promptTypeSelect.appendChild(option);
+  }
+
   document.getElementById('toggle-assess').addEventListener('click', toggleAssessing);
   document.getElementById('clear-console').addEventListener('click', clearConsole);
 
@@ -233,12 +284,10 @@ function injectConsole() {
       output.style.display = 'block';
       controls.style.display = 'flex';
       minimizeButton.textContent = '-';
-      consoleDiv.style.height = '500px';
     } else {
       output.style.display = 'none';
       controls.style.display = 'none';
       minimizeButton.textContent = '+';
-      consoleDiv.style.height = 'auto';
     }
   });
 
