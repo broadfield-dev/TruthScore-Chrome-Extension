@@ -47,6 +47,9 @@ function assessTruthfulness(text, apiProvider, model, promptType) {
       case 'contradictions':
         prompt = `Identify any potential contradictions or inconsistencies in this statement. Output a brief explanation as plain text, or "No contradictions found" if none are detected.\nStatement: "${text}"`;
         break;
+      case 'logicalargument':
+        prompt = `System Prompt: You are an assistant tasked with analyzing a statement for logical fallacies. Examine the statement and return a plain text report identifying any logical fallacies present (e.g., ad hominem, strawman, slippery slope, false dichotomy, etc.), or state "No logical fallacies detected" if none are found. Include a brief explanation of each fallacy identified, if any. Output only the report as plain text, with no markdown or JSON formatting. Example: "The statement 'If we allow one school to ban books, soon all books will be banned everywhere' contains a slippery slope fallacy. This assumes an extreme outcome (all books banned) will inevitably follow a minor action (one school banning books) without evidence for the escalation."\nStatement: "${text}"`;
+        break;
       default:
         resolve({ error: 'Invalid prompt type' });
         return;
@@ -143,9 +146,9 @@ function assessTruthfulness(text, apiProvider, model, promptType) {
             responseObj.score = parseFloat(textResult);
             if (isNaN(responseObj.score) || responseObj.score < 0 || responseObj.score > 1) throw new Error('Invalid score format');
           } else if (['sentiment'].includes(promptType)) {
-            responseObj.result = JSON.parse(textResult); // Only sentiment expects JSON
+            responseObj.result = JSON.parse(textResult);
           } else {
-            responseObj.result = textResult; // Fullreport, summary, contradictions as plain text
+            responseObj.result = textResult;
           }
           responseObj.fullResponse = textResult;
         }
