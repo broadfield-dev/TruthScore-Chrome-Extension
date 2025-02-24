@@ -1,7 +1,7 @@
 #truthfulness-console {
   position: fixed;
   width: 300px;
-  height: 500px;
+  height: fit-content;
   background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 5px;
@@ -53,10 +53,18 @@
 .log-entry.success { color: #0f0; }
 .log-entry.error { color: #ffffff; background:#ff0000; }
 
+
 .console-controls {
   display: flex;
+  flex-direction: column;
   padding: 10px;
   gap: 10px;
+}
+
+.console-controls select {
+  padding: 5px;
+  font-size: 14px;
+  flex: 1;
 }
 
 .button {
