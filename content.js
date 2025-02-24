@@ -69,6 +69,10 @@ const promptConfigs = {
   'logicalargument': {
     name: 'Logical Argument',
     description: 'Detects logical fallacies in the statement.'
+  },
+  'translate': {
+    name: 'Translate to English',
+    description: 'Translates the text into English.'
   }
 };
 
@@ -173,11 +177,7 @@ function toggleAssessing() {
             resultDisplay.style.maxWidth = '300px';
             resultDisplay.style.wordWrap = 'break-word';
             document.body.appendChild(resultDisplay);
-            setTimeout(() => resultDisplay.remove(), promptType === 'fullreport' || promptType === 'logicalargument' ? 5000 : 3000); // Longer timeout for fullreport and logicalargument
-
-            if (response.fullResponse) {
-              logToConsole(`API Response: ${response.fullResponse}`, 'info');
-            }
+            setTimeout(() => resultDisplay.remove(), promptType === 'fullreport' || promptType === 'logicalargument' ? 5000 : 3000);
           } else if (response && response.error) {
             logToConsole('Assessment failed', 'error', `Error: ${response.error}`);
             if (response.error.includes('API key not set')) {
@@ -213,7 +213,7 @@ function clearConsole() {
   }
 }
 
-// Inject the console UI with dropdowns
+// Inject the console UI with dropdowns and resizable handle
 function injectConsole() {
   if (document.getElementById('truthfulness-console')) return;
 
@@ -237,6 +237,7 @@ function injectConsole() {
       <button id="toggle-assess" class="button">Enable Click Assessment</button>
       <button id="clear-console" class="button">Clear</button>
     </div>
+    <div id="resize-handle" class="resize-handle"></div>
   `;
 
   const target = document.body || document.documentElement;
@@ -298,6 +299,7 @@ function injectConsole() {
     }
   });
 
+  // Dragging logic
   let isDragging = false;
   let currentX = 10;
   let currentY = 10;
@@ -324,6 +326,32 @@ function injectConsole() {
   document.addEventListener('mouseup', () => {
     isDragging = false;
     header.style.cursor = 'grab';
+  });
+
+  // Resizing logic (width only)
+  let isResizing = false;
+  let initialWidth;
+  const resizeHandle = document.getElementById('resize-handle');
+  
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    initialWidth = consoleDiv.offsetWidth;
+    initialX = e.clientX;
+    e.preventDefault(); // Prevent text selection during resize
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (isResizing) {
+      const widthDiff = e.clientX - initialX;
+      const newWidth = initialWidth + widthDiff;
+      if (newWidth >= 200) { // Minimum width
+        consoleDiv.style.width = `${newWidth}px`;
+      }
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    isResizing = false;
   });
 
   consoleDiv.style.left = `${currentX}px`;
