@@ -65,6 +65,10 @@ const promptConfigs = {
   'contradictions': {
     name: 'Contradictions',
     description: 'Identifies potential contradictions or inconsistencies.'
+  },
+  'logicalargument': {
+    name: 'Logical Argument',
+    description: 'Detects logical fallacies in the statement.'
   }
 };
 
@@ -82,6 +86,12 @@ function highlightClickedElement(element) {
 function getTextFromClick(event) {
   let element = event.target;
   const blockTags = ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'ul', 'ol', 'li', 'table', 'section', 'article', 'aside', 'main', 'nav', 'footer', 'header'];
+
+  // Check if the click is within the console UI
+  const consoleDiv = document.getElementById('truthfulness-console');
+  if (consoleDiv && consoleDiv.contains(element)) {
+    return ''; // Ignore clicks within the console
+  }
 
   function getClosestBlockAncestor(el) {
     while (el && el.nodeName && blockTags.indexOf(el.nodeName.toLowerCase()) === -1) {
@@ -160,10 +170,10 @@ function toggleAssessing() {
             resultDisplay.style.padding = '3px 8px';
             resultDisplay.style.borderRadius = '3px';
             resultDisplay.style.zIndex = '10000';
-            resultDisplay.style.maxWidth = '300px'; // Added for longer text
-            resultDisplay.style.wordWrap = 'break-word'; // Added for longer text
+            resultDisplay.style.maxWidth = '300px';
+            resultDisplay.style.wordWrap = 'break-word';
             document.body.appendChild(resultDisplay);
-            setTimeout(() => resultDisplay.remove(), promptType === 'fullreport' ? 5000 : 3000); // Longer timeout for fullreport
+            setTimeout(() => resultDisplay.remove(), promptType === 'fullreport' || promptType === 'logicalargument' ? 5000 : 3000); // Longer timeout for fullreport and logicalargument
 
             if (response.fullResponse) {
               logToConsole(`API Response: ${response.fullResponse}`, 'info');
@@ -181,8 +191,6 @@ function toggleAssessing() {
             logToConsole('Unexpected response from API', 'error', 'No result or error provided.');
           }
         });
-      } else {
-        logToConsole('No text found at click location', 'warning', 'Ensure you clicked on a text-containing element.');
       }
     };
     document.addEventListener('click', clickListener, true);
@@ -209,7 +217,6 @@ function clearConsole() {
 function injectConsole() {
   if (document.getElementById('truthfulness-console')) return;
 
-  // Inject the CSS file
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = chrome.runtime.getURL('console.css');
@@ -262,7 +269,7 @@ function injectConsole() {
     });
   }
   apiProviderSelect.addEventListener('change', updateModels);
-  updateModels(); // Initial population
+  updateModels();
 
   // Populate prompt type dropdown
   const promptTypeSelect = document.getElementById('prompt-type');
