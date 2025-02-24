@@ -1,0 +1,23 @@
+{
+    "manifest_version": 3,
+    "name": "TruthScore",
+    "version": "1.0",
+    "description": "Assess text truthfulness with a toggleable console.",
+    "permissions": ["activeTab", "scripting", "tabs", "storage"],
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["contentScript.js"],
+        "css": ["console.css"]
+      }
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "action": {
+      "default_icon": {
+        "16": "icon16.png"
+      },
+      "default_title": "Toggle TruthScore Console"
+    }
+  }
