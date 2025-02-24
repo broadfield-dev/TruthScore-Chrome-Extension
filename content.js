@@ -4,14 +4,54 @@ let isAssessingActive = false;
 let clickListener = null;
 let consoleVisible = false;
 
+// API configurations for dropdowns
+const apiConfigs = {
+  'huggingface-zero-shot': {
+    name: 'Hugging Face Zero-Shot',
+    models: ['facebook/bart-large-mnli', 'typeform/distilbert-base-uncased-mnli']
+  },
+  'huggingface-language': {
+    name: 'Hugging Face Language',
+    models: ['meta-llama/Llama-3-70b', 'google/gemma-7b']
+  },
+  'groq': {
+    name: 'Groq',
+    models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768']
+  },
+  'openrouter': {
+    name: 'OpenRouter',
+    models: ['meta-llama/llama-3-8b-instruct', 'openrouter/deepseek-r1']
+  },
+  'togetherai': {
+    name: 'Together AI',
+    models: ['llama-3-8b', 'mistral-7b-instruct-v0.2']
+  },
+  'cohere': {
+    name: 'Cohere',
+    models: ['command-r-plus', 'command-light']
+  },
+  'xai': {
+    name: 'xAI (Grok)',
+    models: ['grok-beta', 'grok-2']
+  },
+  'openai': {
+    name: 'OpenAI',
+    models: ['gpt-3.5-turbo', 'gpt-4']
+  },
+  'google': {
+    name: 'Google Gemini',
+    models: ['gemini-1.5-pro', 'gemini-1.0-pro']
+  }
+};
+
 // Function to draw a red box around the clicked element
 function highlightClickedElement(element) {
   const originalOutline = element.style.outline;
   element.style.outline = '2px solid red';
-  element.style.zIndex = '10001'; // Ensure it’s above other elements
+  element.style.zIndex = '10001';
   setTimeout(() => {
     element.style.outline = originalOutline;
-  }, 3000); // Remove after 3 seconds
+  }, 3000);
 }
 
 // Function to extract text from the clicked element or its closest block ancestor
@@ -28,12 +68,13 @@ function getTextFromClick(event) {
 
   let block = getClosestBlockAncestor(element);
   if (block && block.textContent.trim() !== '') {
-    highlightClickedElement(block); // Draw red box around the block
+    highlightClickedElement(block);
     return block.textContent.trim();
   }
   return '';
 }
 
+// Function to log messages to the console
 function logToConsole(message, type = 'info', details = '') {
   const consoleOutput = document.getElementById('console-output');
   if (consoleOutput) {
@@ -50,6 +91,7 @@ function logToConsole(message, type = 'info', details = '') {
   }
 }
 
+// Toggle the assessment feature
 function toggleAssessing() {
   isAssessingActive = !isAssessingActive;
   const toggleButton = document.getElementById('toggle-assess');
@@ -62,13 +104,16 @@ function toggleAssessing() {
     clickListener = function(event) {
       const text = getTextFromClick(event);
       if (text) {
+        const apiProvider = document.getElementById('api-provider').value;
+        const model = document.getElementById('api-model').value;
         logToConsole('Processing text: ' + text.slice(0, 50) + (text.length > 50 ? '...' : ''), 'info');
         chrome.runtime.sendMessage({ 
           action: 'assessTruthfulness', 
-          text: text 
+          text: text,
+          apiProvider: apiProvider,
+          model: model
         }, function(response) {
           if (response && response.score !== undefined) {
-            // Convert 0–1 probability to percentage for display (e.g., 0.98 → 98.00%)
             const percentageScore = (response.score * 100).toFixed(2);
             const scoreDisplay = document.createElement('div');
             scoreDisplay.textContent = `Objective Truth Probability: ${percentageScore}%`;
@@ -85,17 +130,19 @@ function toggleAssessing() {
 
             logToConsole(`Objective Truth Probability: ${percentageScore}%`, 'success');
             if (response.fullResponse) {
-              logToConsole(`LLM Response: ${response.fullResponse}`, 'info');
+              logToConsole(`API Response: ${response.fullResponse}`, 'info');
             }
           } else if (response && response.error) {
             logToConsole('Assessment failed', 'error', `Error: ${response.error}`);
-            if (response.error.includes('API request failed')) {
-              logToConsole('Possible causes:', 'error', '1. Invalid Groq API key\n2. Network issues\n3. Rate limit exceeded (check Hugging Face/Groq usage)');
-            } else if (response.error.includes('Unable to determine score')) {
-              logToConsole('Parsing issue:', 'error', 'The LLM response did not return a valid number between 0.01 and 1.00. Check the full response for formatting.');
+            if (response.error.includes('API key not set')) {
+              logToConsole('Action required:', 'error', 'Update your API key in background.js and reload the extension.');
+            } else if (response.error.includes('API request failed')) {
+              logToConsole('Possible causes:', 'error', '1. Invalid API key\n2. Network issues\n3. Rate limit exceeded');
+            } else if (response.error.includes('Invalid score format')) {
+              logToConsole('Parsing issue:', 'error', 'The API response did not return a valid score between 0 and 1.');
             }
           } else {
-            logToConsole('Unexpected response from API', 'error', 'No score or error provided. Check console for network issues.');
+            logToConsole('Unexpected response from API', 'error', 'No score or error provided.');
           }
         });
       } else {
@@ -113,6 +160,7 @@ function toggleAssessing() {
   }
 }
 
+// Clear the console output
 function clearConsole() {
   const consoleOutput = document.getElementById('console-output');
   if (consoleOutput) {
@@ -121,12 +169,13 @@ function clearConsole() {
   }
 }
 
+// Inject the console UI with dropdowns
 function injectConsole() {
   if (document.getElementById('truthfulness-console')) return;
 
   const consoleDiv = document.createElement('div');
   consoleDiv.id = 'truthfulness-console';
-  consoleDiv.className = 'debug-visible'; // Add debug class for testing
+  consoleDiv.className = 'debug-visible';
   consoleDiv.innerHTML = `
     <div class="console-header">
       <span>Truthfulness Assessor Console</span>
@@ -134,12 +183,13 @@ function injectConsole() {
     </div>
     <div id="console-output"></div>
     <div class="console-controls">
+      <select id="api-provider"></select>
+      <select id="api-model"></select>
       <button id="toggle-assess" class="button">Enable Click Assessment</button>
       <button id="clear-console" class="button">Clear</button>
     </div>
   `;
 
-  // Fallback for document.body
   const target = document.body || document.documentElement;
   if (target) {
     target.appendChild(consoleDiv);
@@ -147,6 +197,30 @@ function injectConsole() {
     console.error('No suitable DOM target found for console injection');
     return;
   }
+
+  // Populate API provider dropdown
+  const apiProviderSelect = document.getElementById('api-provider');
+  for (let key in apiConfigs) {
+    const option = document.createElement('option');
+    option.value = key;
+    option.textContent = apiConfigs[key].name;
+    apiProviderSelect.appendChild(option);
+  }
+
+  // Populate model dropdown based on selected API
+  const modelSelect = document.getElementById('api-model');
+  function updateModels() {
+    const selectedApi = apiProviderSelect.value;
+    modelSelect.innerHTML = '';
+    apiConfigs[selectedApi].models.forEach(model => {
+      const option = document.createElement('option');
+      option.value = model;
+      option.textContent = model;
+      modelSelect.appendChild(option);
+    });
+  }
+  apiProviderSelect.addEventListener('change', updateModels);
+  updateModels(); // Initial population
 
   document.getElementById('toggle-assess').addEventListener('click', toggleAssessing);
   document.getElementById('clear-console').addEventListener('click', clearConsole);
@@ -159,7 +233,7 @@ function injectConsole() {
       output.style.display = 'block';
       controls.style.display = 'flex';
       minimizeButton.textContent = '-';
-      consoleDiv.style.height = '500px'; // Match your CSS height
+      consoleDiv.style.height = '500px';
     } else {
       output.style.display = 'none';
       controls.style.display = 'none';
@@ -169,8 +243,8 @@ function injectConsole() {
   });
 
   let isDragging = false;
-  let currentX = 10; // Match your CSS left: 10px
-  let currentY = 10; // Match your CSS top: 10px
+  let currentX = 10;
+  let currentY = 10;
   let initialX, initialY;
   const header = consoleDiv.querySelector('.console-header');
   
@@ -201,9 +275,9 @@ function injectConsole() {
 
   consoleVisible = true;
   logToConsole('Console initialized', 'success');
-  console.log('Console injected, checking visibility:', consoleDiv.style.display, consoleDiv.style.visibility);
 }
 
+// Toggle the console visibility
 function toggleConsole() {
   const consoleDiv = document.getElementById('truthfulness-console');
   console.log('Toggling console, current state:', consoleDiv ? consoleDiv.style.display : 'Not found');
@@ -214,15 +288,14 @@ function toggleConsole() {
       toggleAssessing();
     }
     logToConsole(`Console toggled to ${consoleDiv.style.display}`);
-    console.log('Console toggled, new display:', consoleDiv.style.display, 'visibility:', consoleDiv.style.visibility);
   } else {
     injectConsole();
     consoleVisible = true;
     logToConsole('Console injected on toggle');
-    console.log('Console injected, checking visibility:', consoleDiv.style.display, consoleDiv.style.visibility);
   }
 }
 
+// Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'toggleConsole') {
     console.log('Received toggleConsole message in content script');
